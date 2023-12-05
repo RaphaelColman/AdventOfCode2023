@@ -3,16 +3,16 @@ module Solutions.Day4
     ( aoc4
     ) where
 
-import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
-                                      printSolutions, printTestSolutions)
-import           Control.Applicative (Alternative (some))
-import           Text.Parser.Char    (CharParsing (char))
-import           Text.Parser.Token   (integer, token)
-import           Text.Trifecta       (CharParsing (string), Parser, sepBy,
-                                      whiteSpace)
-import Combinatorics.Mastermind (Eval(white))
-import Data.List (union, intersect)
-import GHC.OldList (nub)
+import           Combinatorics.Mastermind (Eval (white))
+import           Common.AoCSolutions      (AoCSolution (MkAoCSolution),
+                                           printSolutions, printTestSolutions)
+import           Control.Applicative      (Alternative (some))
+import           Data.List                (intersect, union)
+import           GHC.OldList              (nub)
+import           Text.Parser.Char         (CharParsing (char))
+import           Text.Parser.Token        (integer, token)
+import           Text.Trifecta            (CharParsing (string), Parser, sepBy,
+                                           whiteSpace)
 
 aoc4 :: IO ()
 aoc4 = do
@@ -23,6 +23,13 @@ data Card
   = MkCard
       { _winners :: ![Integer]
       , _entries :: ![Integer]
+      }
+  deriving (Eq, Show)
+
+data CardState
+  = MkCardState
+      { _unprocessedCards       :: ![Card]
+      , _total :: !Integer
       }
   deriving (Eq, Show)
 
@@ -48,3 +55,6 @@ cardPoints :: Card -> Int
 cardPoints MkCard {..} = convertToPoints $ length $ _winners `intersect` _entries
   where convertToPoints 0 = 0
         convertToPoints x = 2^(x-1)
+
+processCard :: CardState -> CardState
+processCard MkCardState{..} = undefined
