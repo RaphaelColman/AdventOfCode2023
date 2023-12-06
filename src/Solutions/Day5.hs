@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 module Solutions.Day5
     ( aoc5
     ) where
@@ -5,7 +6,12 @@ module Solutions.Day5
 import           Common.AoCSolutions             (AoCSolution (MkAoCSolution),
                                                   printSolutions,
                                                   printTestSolutions)
+import           Common.MaybeUtils               (firstJust)
 import           Control.Applicative.Combinators (some)
+import           Data.Foldable                   (Foldable (foldl'))
+import qualified Data.Map.Strict                 as M
+import           Data.Maybe                      (fromMaybe)
+import           Debug.Trace
 import           Text.Parser.Char                (letter, newline)
 import           Text.Parser.Token               (TokenParsing (token))
 import           Text.Trifecta                   (CharParsing (string), Parser,
@@ -13,12 +19,14 @@ import           Text.Trifecta                   (CharParsing (string), Parser,
 
 aoc5 :: IO ()
 aoc5 = do
-  printTestSolutions 5 $ MkAoCSolution parseInput part1
-  --printSolutions 5 $ MkAoCSolution parseInput part2
+  --printSolutions 5 $ MkAoCSolution parseInput part1
+  printTestSolutions 5 $ MkAoCSolution parseInput part2
 
 data AlmanacComponent = Seed | Soil | Fertilizer | Water | Light | Temperature | Humidity | Location deriving
-    ( Enum
+    ( Bounded
+    , Enum
     , Eq
+    , Ord
     , Show
     )
 
@@ -68,7 +76,28 @@ parseSeeds = do
   string "seeds: "
   some integer
 
-part1 = id
 
-part2 :: String -> String
+part1 :: ([Integer], [AlmanacMap]) -> Integer
+part1 (seeds, maps) = minimum $ map (`resolveSeed` organisedMaps) seeds
+  where organisedMaps = organiseMaps maps
+
 part2 = undefined
+
+
+consultMap :: AlmanacMap -> Integer -> Integer
+consultMap MkAlmanacMap{..} value = fromMaybe value mapped
+  where consultRange (dest, source, range) = if (value >= source) && (value <= source + range)
+                                             then Just $ value - source + dest
+                                             else Nothing
+        mapped = firstJust $ map consultRange _ranges
+
+organiseMaps :: [AlmanacMap] -> M.Map AlmanacComponent AlmanacMap
+organiseMaps maps = M.fromList $ map (\m -> (_from m, m)) maps
+
+resolveSeed :: Integer -> M.Map AlmanacComponent AlmanacMap -> Integer
+resolveSeed seed maps = foldl' foldOverMap seed [Seed .. Humidity]
+  where getMap m = maps M.! m --Make this more type safe by handling nulls?
+        foldOverMap value component = consultMap (getMap component) value
+
+seedRanges :: [Integer] -> [Integer]
+seedRanges = undefined
