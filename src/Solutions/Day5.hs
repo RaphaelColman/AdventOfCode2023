@@ -81,7 +81,7 @@ part1 :: ([Integer], [AlmanacMap]) -> Integer
 part1 (seeds, maps) = minimum $ map (`resolveSeed` organisedMaps) seeds
   where organisedMaps = organiseMaps maps
 
-part2 = undefined
+part2 = id
 
 
 consultMap :: AlmanacMap -> Integer -> Integer
