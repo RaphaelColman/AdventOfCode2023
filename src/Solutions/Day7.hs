@@ -1,4 +1,5 @@
-{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE InstanceSigs    #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Solutions.Day7
     ( aoc7
     ) where
@@ -7,21 +8,22 @@ import qualified Combinatorics.Coin        as M
 import           Common.AoCSolutions       (AoCSolution (MkAoCSolution),
                                             printSolutions, printTestSolutions)
 import           Common.ListUtils          (freqs)
+import           Common.MapUtils           (maximumValue)
+import           Control.Lens              (makeLenses)
+import           Control.Lens.Combinators  (mapped)
+import           Control.Lens.Getter       ((^.))
+import           Control.Lens.Lens         ((&))
+import           Control.Lens.Setter       (over, (.~))
 import           Control.Monad.Combinators (some)
 import           Data.List                 (sort)
 import qualified Data.Map                  as M
+import           Debug.Trace
 import           Text.Parser.Char          (char)
 import           Text.Parser.Token         (token)
 import           Text.Trifecta             (Parser, alphaNum, brackets,
                                             commaSep, integer, semiSep,
                                             whiteSpace)
-
-aoc7 :: IO ()
-aoc7 = do
-  printSolutions 7 $ MkAoCSolution parseInput part1
-  --printSolutions 7 $ MkAoCSolution parseInput part2
-
-data Card = Two | Three | Four | Five | Six | Seven | Eight | Nine | Ten | Jack | Queen | King | Ace deriving
+data Card = Joker | Two | Three | Four | Five | Six | Seven | Eight | Nine | Ten | Jack | Queen | King | Ace deriving
     ( Bounded
     , Enum
     , Eq
@@ -46,6 +48,13 @@ data Player
       , _bid  :: !Integer
       }
   deriving (Eq, Show)
+
+makeLenses ''Player
+
+aoc7 :: IO ()
+aoc7 = do
+  --printSolutions 7 $ MkAoCSolution parseInput part1
+  printSolutions 7 $ MkAoCSolution parseInput part2
 
 parseInput :: Parser [Player]
 parseInput = some $ token parseMove
@@ -78,10 +87,13 @@ parseCard = do
     _   -> fail "Invalid card"
 
 part1 :: [Player] -> Integer
-part1 = sum . zipWith (*) [1..] . map _bid . sort
+part1 = solve
 
-part2 :: String -> String
-part2 = undefined
+part2 :: [Player] -> Integer
+part2 = solve . jacksToJokers
+
+solve :: [Player] -> Integer
+solve = sum . zipWith (*) [1..] . map _bid . sort
 
 instance Ord Player where
   compare :: Player -> Player -> Ordering
@@ -101,5 +113,16 @@ handType cards = case groupings of
   [3, 2]          -> FullHouse
   [4, 1]          -> FourOfAKind
   [5]             -> FiveOfAKind
-  xs              -> error $ "Invalid hand: " ++ show xs --Make this return a Maybe instead?
-  where groupings = reverse $ sort $ map snd $ M.toList $ freqs cards
+  xs              -> error $ "Invalid hand: " ++ show cards --Make this return a Maybe instead?
+  where groupings = reverse $ sort $ map snd $ M.toList converted
+        frqs = freqs cards
+        numJokers = M.findWithDefault 0 Joker frqs
+        (maxCard, frq) = maximumValue $ M.delete Joker frqs
+        converted
+          | numJokers == 0 = frqs
+          | numJokers == 5 = frqs
+          | otherwise = M.insertWith (+) maxCard numJokers frqs & M.delete Joker
+
+jacksToJokers :: [Player] -> [Player]
+jacksToJokers = over (mapped . hand) convertHand
+  where convertHand hand = map (\card -> if card == Jack then Joker else card) hand

@@ -4,6 +4,7 @@ import           Data.Either   (partitionEithers)
 import           Data.Foldable (minimumBy)
 import           Data.Function (on)
 import qualified Data.Map      as M
+import Data.List (maximumBy)
 
 mapIf :: (a -> Bool) -> (a -> a) -> M.Map k a -> M.Map k a
 mapIf condition f =
@@ -32,3 +33,6 @@ partitionKeys f combining map' =
 
 minimumValue :: (Ord a) => M.Map k a -> (k, a)
 minimumValue = minimumBy (compare `on` snd) . M.toList
+
+maximumValue :: (Ord a) => M.Map k a -> (k, a)
+maximumValue = maximumBy (compare `on` snd) . M.toList
