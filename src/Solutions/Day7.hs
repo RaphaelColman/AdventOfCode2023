@@ -53,14 +53,14 @@ makeLenses ''Player
 
 aoc7 :: IO ()
 aoc7 = do
-  --printSolutions 7 $ MkAoCSolution parseInput part1
+  printSolutions 7 $ MkAoCSolution parseInput part1
   printSolutions 7 $ MkAoCSolution parseInput part2
 
 parseInput :: Parser [Player]
-parseInput = some $ token parseMove
+parseInput = some $ token parsePlayer
 
-parseMove :: Parser Player
-parseMove = do
+parsePlayer :: Parser Player
+parsePlayer = do
   h <- parseHand <* whiteSpace
   MkPlayer h <$> integer
 
