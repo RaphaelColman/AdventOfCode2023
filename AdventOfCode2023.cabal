@@ -77,6 +77,7 @@ library
     , base >=4.7 && <5
     , combinatorial
     , containers
+    , data-interval
     , directory
     , dotenv
     , finite-typelits
@@ -110,6 +111,7 @@ executable AdventOfCode2023-exe
     , base >=4.7 && <5
     , combinatorial
     , containers
+    , data-interval
     , directory
     , dotenv
     , finite-typelits
@@ -144,6 +146,7 @@ test-suite AdventOfCode2023-test
     , base >=4.7 && <5
     , combinatorial
     , containers
+    , data-interval
     , directory
     , dotenv
     , finite-typelits

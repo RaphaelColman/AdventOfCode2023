@@ -9,6 +9,8 @@ import           Common.AoCSolutions             (AoCSolution (MkAoCSolution),
 import           Common.MaybeUtils               (firstJust)
 import           Control.Applicative.Combinators (some)
 import           Data.Foldable                   (Foldable (foldl'))
+import qualified Data.Interval                   as IV
+import qualified Data.IntervalMap.Strict         as IVM
 import qualified Data.Map.Strict                 as M
 import           Data.Maybe                      (fromMaybe)
 import           Debug.Trace
@@ -81,7 +83,12 @@ part1 :: ([Integer], [AlmanacMap]) -> Integer
 part1 (seeds, maps) = minimum $ map (`resolveSeed` organisedMaps) seeds
   where organisedMaps = organiseMaps maps
 
-part2 = id
+part2 x = foo
+  where someRanges = [(50, 98, 2), (52, 50, 48)]
+        foo = IVM.fromList $ map (\(dest,src,len) -> (fromRange src len, dest-src)) someRanges
+
+fromRange :: Integer -> Integer -> IV.Interval Integer
+fromRange x len = IV.Finite x IV.<=..<= IV.Finite (x + len)
 
 
 consultMap :: AlmanacMap -> Integer -> Integer
