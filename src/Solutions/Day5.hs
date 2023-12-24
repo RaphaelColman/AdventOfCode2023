@@ -1,4 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections   #-}
+
 module Solutions.Day5
     ( aoc5
     ) where
@@ -6,11 +8,13 @@ module Solutions.Day5
 import           Common.AoCSolutions             (AoCSolution (MkAoCSolution),
                                                   printSolutions,
                                                   printTestSolutions)
+import           Common.ListUtils                (window2)
 import           Common.MaybeUtils               (firstJust)
 import           Control.Applicative.Combinators (some)
 import           Data.Foldable                   (Foldable (foldl'))
 import qualified Data.Interval                   as IV
 import qualified Data.IntervalMap.Strict         as IVM
+import qualified Data.IntervalSet                as IVS
 import qualified Data.Map.Strict                 as M
 import           Data.Maybe                      (fromMaybe)
 import           Debug.Trace
@@ -18,11 +22,13 @@ import           Text.Parser.Char                (letter, newline)
 import           Text.Parser.Token               (TokenParsing (token))
 import           Text.Trifecta                   (CharParsing (string), Parser,
                                                   count, integer, whiteSpace)
+import Data.List.Split (chunksOf)
+import Data.IntegerInterval (lowerBound)
 
 aoc5 :: IO ()
 aoc5 = do
-  --printSolutions 5 $ MkAoCSolution parseInput part1
-  printTestSolutions 5 $ MkAoCSolution parseInput part2
+  printSolutions 5 $ MkAoCSolution parseInput part1
+  printSolutions 5 $ MkAoCSolution parseInput part2
 
 data AlmanacComponent = Seed | Soil | Fertilizer | Water | Light | Temperature | Humidity | Location deriving
     ( Bounded
@@ -34,15 +40,23 @@ data AlmanacComponent = Seed | Soil | Fertilizer | Water | Light | Temperature |
 
 type Range = (Integer, Integer, Integer)
 
-data AlmanacMap
-  = MkAlmanacMap
-      { _from   :: !AlmanacComponent
-      , _to     :: !AlmanacComponent
-      , _ranges :: ![Range]
+data AlmanacMapRaw
+  = MkAlmanacMapRaw
+      { _fromComponent :: !AlmanacComponent
+      , _toComponent   :: !AlmanacComponent
+      , _ranges        :: ![Range]
       }
   deriving (Eq, Show)
 
-type Almanac = ([Integer], [AlmanacMap])
+data AlmanacMap
+  = MkAlmanacMap
+      { _from :: !AlmanacComponent
+      , _to   :: !AlmanacComponent
+      , _map  :: !(IVM.IntervalMap Integer Integer)
+      }
+  deriving (Eq, Show)
+
+type Almanac = ([Integer], [AlmanacMapRaw])
 
 parseInput :: Parser Almanac
 parseInput = do
@@ -50,13 +64,13 @@ parseInput = do
   maps <- some parseMap
   pure (seeds, maps)
 
-parseMap :: Parser AlmanacMap
+parseMap :: Parser AlmanacMapRaw
 parseMap = do
   from <- some letter <* string "-to-" >>= toComponent
   to <- some letter <* string " map:" >>= toComponent
   newline
   ranges <- some $ token parseRange
-  pure $ MkAlmanacMap from to ranges
+  pure $ MkAlmanacMapRaw from to ranges
   where toComponent str = case str of
           "seed"        -> pure Seed
           "soil"        -> pure Soil
@@ -79,32 +93,41 @@ parseSeeds = do
   some integer
 
 
-part1 :: ([Integer], [AlmanacMap]) -> Integer
+part1 :: ([Integer], [AlmanacMapRaw]) -> Integer
 part1 (seeds, maps) = minimum $ map (`resolveSeed` organisedMaps) seeds
   where organisedMaps = organiseMaps maps
 
-part2 x = foo
-  where someRanges = [(50, 98, 2), (52, 50, 48)]
-        foo = IVM.fromList $ map (\(dest,src,len) -> (fromRange src len, dest-src)) someRanges
+part2 :: ([Integer], [AlmanacMapRaw]) -> IVS.Extended Integer
+part2 (seeds, maps) = minimum $ map IV.lowerBound $ IVS.toList locations
+  where seedRanges = toSeedRanges seeds
+        organisedMaps = organiseMaps maps
+        locations = foldl' (\ranges component -> consultMapWithRanges (organisedMaps M.! component) ranges) seedRanges [Seed .. Humidity]
+
+toAlamanacMap :: AlmanacMapRaw -> AlmanacMap
+toAlamanacMap MkAlmanacMapRaw{..} = MkAlmanacMap _fromComponent _toComponent intervalMap
+  where intervalMap = IVM.fromList $ map (\(dest, src, len) -> (fromRange src len, dest-src)) _ranges
 
 fromRange :: Integer -> Integer -> IV.Interval Integer
 fromRange x len = IV.Finite x IV.<=..<= IV.Finite (x + len)
 
 
 consultMap :: AlmanacMap -> Integer -> Integer
-consultMap MkAlmanacMap{..} value = fromMaybe value mapped
-  where consultRange (dest, source, range) = if (value >= source) && (value <= source + range)
-                                             then Just $ value - source + dest
-                                             else Nothing
-        mapped = firstJust $ map consultRange _ranges
+consultMap MkAlmanacMap{..} value = value + IVM.findWithDefault 0 value _map
 
-organiseMaps :: [AlmanacMap] -> M.Map AlmanacComponent AlmanacMap
-organiseMaps maps = M.fromList $ map (\m -> (_from m, m)) maps
+consultMapWithRanges :: AlmanacMap -> IVS.IntervalSet Integer -> IVS.IntervalSet Integer
+consultMapWithRanges MkAlmanacMap{..} inputs = converted <> misses
+  where tempMap = IVM.fromList $ map (, ()) $ IVS.toList inputs
+        hits = IVM.intersectionWith const _map tempMap
+        converted = IVS.fromList $ map (\(interval, modifier) -> IV.mapMonotonic (+ modifier) interval) $ IVM.toList hits
+        misses = IVM.keysSet  $ tempMap IVM.\\ _map
+
+organiseMaps :: [AlmanacMapRaw] -> M.Map AlmanacComponent AlmanacMap
+organiseMaps maps = M.fromList $ map (\m -> (_fromComponent m, toAlamanacMap m)) maps
 
 resolveSeed :: Integer -> M.Map AlmanacComponent AlmanacMap -> Integer
 resolveSeed seed maps = foldl' foldOverMap seed [Seed .. Humidity]
   where getMap m = maps M.! m --Make this more type safe by handling nulls?
         foldOverMap value component = consultMap (getMap component) value
 
-seedRanges :: [Integer] -> [Integer]
-seedRanges = undefined
+toSeedRanges :: [Integer] -> IVS.IntervalSet Integer
+toSeedRanges = IVS.fromList . map (\[a, b] -> fromRange a b) . chunksOf 2
