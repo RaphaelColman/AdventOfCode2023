@@ -6,7 +6,6 @@ module Solutions.Day8
 import           Common.AoCSolutions     (AoCSolution (MkAoCSolution),
                                           printSolutions, printTestSolutions)
 import           Data.Foldable           (Foldable (foldl'))
-import           Data.Functor.Foldable
 import qualified Data.Map.Strict         as M
 import           Text.Parser.Char        (char)
 import           Text.Parser.Combinators (some)
@@ -15,7 +14,7 @@ import           Text.Trifecta           (Parser, alphaNum, commaSep, letter,
 
 aoc8 :: IO ()
 aoc8 = do
-  --printTestSolutions 8 $ MkAoCSolution parseInput part1
+  printSolutions 8 $ MkAoCSolution parseInput part1
   printSolutions 8 $ MkAoCSolution parseInput part2
 
 data Direction = Right' | Left' deriving (Bounded, Enum, Eq, Ord, Show)
@@ -53,8 +52,8 @@ parseInput = do
   map <- parseCamelMap
   pure (directions, map)
 
---part1 :: String -> String
---part1 = undefined
+part1 :: ([Direction], CamelMap) -> Integer
+part1 (directions, camelMap) = pathLength camelMap "AAA" directions
 
 part2 :: ([Direction], CamelMap) -> Integer
 part2 (directions, camelMap) = foldr1 lcm lengths
