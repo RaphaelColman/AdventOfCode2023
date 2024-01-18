@@ -43,6 +43,7 @@ dependencies:
 - parsers
 - regex-tdfa
 - data-interval
+- recursion-schemes
 
 library:
   source-dirs: src

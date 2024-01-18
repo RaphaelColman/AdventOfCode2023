@@ -89,6 +89,7 @@ library
     , mtl
     , parser-combinators
     , parsers
+    , recursion-schemes
     , regex-tdfa
     , safe
     , split
@@ -123,6 +124,7 @@ executable AdventOfCode2023-exe
     , mtl
     , parser-combinators
     , parsers
+    , recursion-schemes
     , regex-tdfa
     , safe
     , split
@@ -158,6 +160,7 @@ test-suite AdventOfCode2023-test
     , mtl
     , parser-combinators
     , parsers
+    , recursion-schemes
     , regex-tdfa
     , safe
     , split
