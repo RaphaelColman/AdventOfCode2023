@@ -31,9 +31,11 @@ enumerateMultilineStringToVectorMap :: String -> M.Map (V2 Int) Char
 enumerateMultilineStringToVectorMap =
   M.fromList . map (\((x, y), c) -> (V2 x y, c)) . enumerateMultilineString
 
+-- | All adjacent neighbours of a point (including diagonals) within a grid of points
 gridNeighbours :: Grid a -> Point -> M.Map Point a
 gridNeighbours grid point = M.restrictKeys grid $ neighbours point
 
+-- | All adjacent neighbours of a point (including diagonals)
 neighbours :: Point -> S.Set Point
 neighbours point = S.fromList $ map (+ point) directions
   where
@@ -74,6 +76,7 @@ allOrthogonalDirections = [unit _x, -unit _x, unit _y, -unit _y]
 allOrthogonalNeighbours :: V2 Int -> S.Set Point
 allOrthogonalNeighbours v = S.fromList $ map (v +) allOrthogonalDirections
 
+-- | All adjacent orthogonal neighbours of a point
 gridOrthogonalNeighbours :: Grid a -> Point -> M.Map Point a
 gridOrthogonalNeighbours grid point = M.restrictKeys grid $ allOrthogonalNeighbours point
 
