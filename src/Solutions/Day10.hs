@@ -12,11 +12,14 @@ import           Common.Geometry                 (Grid, Point,
                                                   gridNeighbours,
                                                   gridOrthogonalNeighbours)
 import           Control.Applicative.Combinators (some)
+import           Control.Monad                   (filterM)
 import qualified Control.Monad                   as Data
 import           Control.Monad.RWS               (MonadReader (ask),
                                                   MonadTrans (lift), asks)
-import           Control.Monad.Reader            (Reader, ReaderT (runReaderT))
-import           Control.Monad.Trans.Maybe       (MaybeT (MaybeT))
+import           Control.Monad.Reader            (Reader, ReaderT (runReaderT),
+                                                  runReader)
+import           Control.Monad.State             (StateT (runStateT))
+import           Control.Monad.Trans.Maybe       (MaybeT (MaybeT, runMaybeT))
 import           Control.Monad.Trans.Reader      (ReaderT (..))
 import           Data.Function                   ((&))
 import           Data.Functor.Foldable           (ListF)
@@ -25,9 +28,10 @@ import qualified Data.Map                        as M
 import           Data.Maybe                      (mapMaybe)
 import           Data.Sequence                   (Seq (Empty, (:<|), (:|>)),
                                                   ViewR ((:>)), (|>))
-import qualified Data.Sequence                   as Seq (Seq, fromList, viewr, (!?), lookup, index)
+import qualified Data.Sequence                   as Seq (Seq, fromList, index,
+                                                         lookup, viewr, (!?))
 import qualified Data.Set                        as S
-import           Debug.Trace                     
+import           Debug.Trace
 import           Linear                          (V2 (V2), lookAt)
 import           Linear.V2                       (V2)
 import           Safe                            (headMay)
@@ -37,7 +41,7 @@ data Cardinal = N | S | E | W deriving (Bounded, Enum, Eq, Ord, Show)
 
 aoc10 :: IO ()
 aoc10 = do
-  printSolutions 10 $ MkAoCSolution parseInput part1
+  printTestSolutions 10 $ MkAoCSolution parseInput part1
   --printSolutions 10 $ MkAoCSolution parseInput part2
 
 parseInput :: Parser (Grid Char)
@@ -45,47 +49,59 @@ parseInput = do
   allChars <- some anyChar
   pure $ enumerateMultilineStringToVectorMap allChars
 
-part1 = solve
+part1 :: Grid Char -> Maybe Int
+part1 grid = do
+  runReader (runMaybeT solve) grid
 
 part2 :: String -> String
 part2 = undefined
 
-solve :: Grid Char -> Maybe Int
-solve grid = do
-  (start, _) <- findStart grid
-  first <- pickFirstPipe grid start
-  let path = traverseLoop grid start first
+solve :: MaybeT (Reader (Grid Char)) Int
+solve = do
+  (start, _) <- findStart
+  first <- pickFirstPipe start
+  path <- lift $ traverseLoop start first
   pure $ length path `div` 2
 
-findStart :: Grid Char -> Maybe (Point, Char)
-findStart grid = let filtered = M.filter (=='S') grid
-                 in M.toList filtered & headMay
+findStart :: MaybeT (Reader (Grid Char)) (Point, Char)
+findStart = do
+  grid <- ask
+  let filtered = M.filter (=='S') grid
+  M.toList filtered & headMay & MaybeT . pure
 
 -- | Given a point, look at the pipe and return a list of the neighbours to which it connects
-getValidNeighbours :: Grid Char -> Point -> [Point]
-getValidNeighbours grid p = M.keys $ M.restrictKeys grid (S.fromList lookups)
-  where openC = openCardinals (grid M.! p)
-        lookups = map (\c -> p + cardinalToVector c) openC
+getValidNeighbours :: Point -> Reader (Grid Char) [Point]
+getValidNeighbours p = do
+  grid <- ask
+  let openC = openCardinals (grid M.! p)
+  let lookups = map (\c -> p + cardinalToVector c) openC
+  pure $ M.keys $ M.restrictKeys grid (S.fromList lookups)
 
 -- | This will just pick the first valid pipe next to the start.
-pickFirstPipe :: Grid Char -> Point -> Maybe Point
-pickFirstPipe grid start = headMay $ filter connectsToStart n
-  where n = M.keys $ gridOrthogonalNeighbours grid start
-        connectsToStart :: Point -> Bool
-        connectsToStart point = start `elem` getValidNeighbours grid point
+pickFirstPipe :: Point -> MaybeT (Reader (Grid Char)) Point
+pickFirstPipe start = do
+  grid <- lift ask
+  let points = M.keys $ gridOrthogonalNeighbours grid start
+  MaybeT $ headMay <$> filterM connectsToStart points
+  where connectsToStart :: Point -> Reader (Grid Char) Bool
+        connectsToStart point = do
+          validNeighbours <- getValidNeighbours point
+          pure $ start `elem` validNeighbours
 
 -- This could maybe use recursion-schemes ana if I could figure out how to make a baseFunctor
 -- out of Data.Sequence
-traverseLoop :: Grid Char -> Point -> Point -> Seq Point
-traverseLoop grid start firstPipe = go grid $ Seq.fromList [start, firstPipe]
-  where go grid' path@(rest :|> mostRecent :|> current)
-                      | current == start = path
-                      | otherwise = let validNeighbours = getValidNeighbours grid' current
+traverseLoop :: Point -> Point -> Reader (Grid Char) (Seq Point)
+traverseLoop start firstPipe = do
+  go $ Seq.fromList [start, firstPipe]
+  where go path@(rest :|> mostRecent :|> current)
+                      | current == start = pure path
+                      | otherwise = do
+                            validNeighbours <- getValidNeighbours current
                                         --Each pipe connects to two places, so there should only be one which is not the
                                         --one we just came from
-                                        [next] = filter (/= mostRecent) validNeighbours
-                                    in go grid' $ path |> next
-        go grid' Empty = error "Empty sequence. This should not be possible"
+                            let [next] = filter (/= mostRecent) validNeighbours
+                                    in go $ path |> next
+        go Empty = error "Empty sequence. This should not be possible"
 
 --Just looked at the puzzle input and there are only two points which connect to the S. So I'm not really sure what the other
 --pipes are for. Can I write this just asuming that the S only connects to two valid pipes?
