@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 module Solutions.Day10
     ( aoc10
     ) where
@@ -101,16 +100,11 @@ traverseLoop start firstPipe = do
                                         --one we just came from
                             let [next] = filter (/= mostRecent) validNeighbours
                                     in go $ path |> next
+        go (Empty :|> thing) = error "Sequence with fewer than two elements. This should not be possible"
         go Empty = error "Empty sequence. This should not be possible"
 
 --Just looked at the puzzle input and there are only two points which connect to the S. So I'm not really sure what the other
 --pipes are for. Can I write this just asuming that the S only connects to two valid pipes?
-
--- Furthest point should be half way along the given path.
--- If it's an odd number of steps then great. Otherwise error for now
-furthestPoint :: Seq Point -> Point
-furthestPoint path = let halfWay = length path `div` 2
-                     in Seq.index path halfWay
 
 openCardinals :: Char -> [Cardinal]
 openCardinals c = case c of
