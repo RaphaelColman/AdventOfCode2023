@@ -9,20 +9,21 @@ import           Common.Geometry                 (Grid, Point,
                                                   enumerateMultilineString,
                                                   enumerateMultilineStringToVectorMap,
                                                   gridNeighbours,
-                                                  gridOrthogonalNeighbours)
+                                                  gridOrthogonalNeighbours,
+                                                  toColumns, toRows)
 import           Control.Applicative.Combinators (some)
 import           Control.Monad                   (filterM)
-import qualified Control.Monad                   as Data
-import           Control.Monad.RWS               (MonadReader (ask),
+import           Control.Monad.RWS.Strict        (MonadReader (ask),
                                                   MonadTrans (lift), asks)
 import           Control.Monad.Reader            (Reader, ReaderT (runReaderT),
                                                   runReader)
-import           Control.Monad.State             (StateT (runStateT))
 import           Control.Monad.Trans.Maybe       (MaybeT (MaybeT, runMaybeT))
 import           Control.Monad.Trans.Reader      (ReaderT (..))
+import           Data.Foldable                   (Foldable (toList), foldlM)
 import           Data.Function                   ((&))
 import           Data.Functor.Foldable           (ListF)
 import           Data.Functor.Foldable.TH
+import           Data.List                       (intersect, intersectBy)
 import qualified Data.Map                        as M
 import           Data.Maybe                      (mapMaybe)
 import           Data.Sequence                   (Seq (Empty, (:<|), (:|>)),
@@ -40,8 +41,8 @@ data Cardinal = N | S | E | W deriving (Bounded, Enum, Eq, Ord, Show)
 
 aoc10 :: IO ()
 aoc10 = do
-  printTestSolutions 10 $ MkAoCSolution parseInput part1
-  --printSolutions 10 $ MkAoCSolution parseInput part2
+  --printTestSolutions 10 $ MkAoCSolution parseInput part1
+  printTestSolutions 10 $ MkAoCSolution parseInput part2
 
 parseInput :: Parser (Grid Char)
 parseInput = do
@@ -50,17 +51,24 @@ parseInput = do
 
 part1 :: Grid Char -> Maybe Int
 part1 grid = do
-  runReader (runMaybeT solve) grid
+  path <- runReader (runMaybeT solvePath) grid
+  pure $ length path `div` 2
 
-part2 :: String -> String
-part2 = undefined
+part2 :: Grid Char -> Maybe [Point]
+part2 grid = do
+  runReader (runMaybeT solvePart2) grid
+  where cols = toColumns grid
 
-solve :: MaybeT (Reader (Grid Char)) Int
-solve = do
+solvePart2 :: MaybeT (Reader (Grid Char)) [Point]
+solvePart2 = do
+  path <- solvePath
+  lift $ insidePoints path
+
+solvePath :: MaybeT (Reader (Grid Char)) (Seq Point)
+solvePath = do
   (start, _) <- findStart
   first <- pickFirstPipe start
-  path <- lift $ traverseLoop start first
-  pure $ length path `div` 2
+  lift $ traverseLoop start first
 
 findStart :: MaybeT (Reader (Grid Char)) (Point, Char)
 findStart = do
@@ -104,7 +112,34 @@ traverseLoop start firstPipe = do
         go Empty = error "Empty sequence. This should not be possible"
 
 --Just looked at the puzzle input and there are only two points which connect to the S. So I'm not really sure what the other
---pipes are for. Can I write this just asuming that the S only connects to two valid pipes?
+--pipes are for. Can I write this just assuming that the S only connects to two valid pipes?
+
+insidePoints :: Seq Point -> (Reader (Grid Char)) [Point]
+insidePoints path = do
+  rows <- asks toRows
+  let insideAccordingToRows = concatMap (`processRow` path) rows
+  traceShowM "foobar"
+  columns <- asks toColumns
+  let insideAccordingToColumns = concatMap (`processColumn` path) columns
+  pure $ traceShow ("rows:" ++ show insideAccordingToRows ++ " columns: " ++ show insideAccordingToColumns) $ insideAccordingToRows `intersect` insideAccordingToColumns
+
+processRow :: [(Point, Char)] -> Seq Point -> [Point]
+processRow row foundPath = snd $ foldl process (False, []) row
+  where process current@(isInside, pointsFoundSoFar) (point, char)
+          | char == '|'  && point `S.member` foundPathAsSet = (not isInside, pointsFoundSoFar)
+          | char == '.'  && isInside = (isInside, point : pointsFoundSoFar)
+          | otherwise = current
+        foundPathAsSet = S.fromList $ toList foundPath
+-- this returns an empty list which is concerning. BUT also we need to consider L, J, 7 and F as vertical pipes. We should probably also worry about S
+
+processColumn :: [(Point, Char)] -> Seq Point -> [Point]
+processColumn column foundPath = snd $ foldl process (False, []) column
+  where process current@(isInside, pointsFoundSoFar) (point, char)
+          | char == '-'  && point `S.member` foundPathAsSet = (not isInside, pointsFoundSoFar)
+          | char == '.'  && isInside = (isInside, point : pointsFoundSoFar)
+          | otherwise = current
+        foundPathAsSet = S.fromList $ toList foundPath
+-- this returns an empty list which is concerning. BUT also we need to consider L, J, 7 and F as vertical pipes. We should probably also worry about S
 
 openCardinals :: Char -> [Cardinal]
 openCardinals c = case c of
@@ -124,3 +159,7 @@ cardinalToVector c = case c of
   S -> V2 0 1
   E -> V2 1 0
   W -> V2 (-1) 0
+
+--'S' as a vertical pipe is not strictly true
+isVerticalPipe :: Char -> Bool
+isVerticalPipe = flip elem ['|', 'L', '7', 'F', 'J', 'S']

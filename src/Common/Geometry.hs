@@ -95,3 +95,8 @@ toRows :: Grid a -> [[(Point, a)]]
 toRows grid = chunksOf ((maxX ^. _x) + 1) ordered
   where ordered = toOrderedList grid
         maxX = maximumBy (\a b -> compare (a ^. _x) (b ^. _x)) $ M.keys grid
+
+toColumns :: Grid a -> [[(Point, a)]]
+toColumns grid = chunksOf ((maxY ^. _y) + 1) ordered
+  where ordered = toOrderedList grid
+        maxY = maximumBy (\a b -> compare (a ^. _y) (b ^. _y)) $ M.keys grid
